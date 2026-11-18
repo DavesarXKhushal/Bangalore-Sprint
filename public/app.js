@@ -224,6 +224,8 @@ async function load(fresh) {
     last = st;
     ["h-board", "l-board", "f-board", "g-board"].forEach(id => document.getElementById(id).href = st.sheet_url);
     ["h-drive", "g-drive"].forEach(id => document.getElementById(id).href = st.drive_url);
+    const L = st.links || {};
+    [["g-reels", L.reels], ["g-scripts", L.scripts], ["g-docs", L.docs]].forEach(([id, u]) => { if (u) document.getElementById(id).href = u; });
     const day = Math.min(61, Math.max(1, istDay(Date.now()) - istDay(START) + 1));
     const left = Math.max(0, istDay(END) - istDay(Date.now()));
     document.getElementById("dayline").textContent = `Day ${day}. Ends Jan 17, 2027.`;
