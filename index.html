@@ -17,10 +17,6 @@
       <svg viewBox="0 0 94 100" aria-hidden="true"><path fill="currentColor" d="M94.0278 100H0V0H94.0278V100ZM13.9389 91.4222H25.8833V88.2056H13.9389V91.4222ZM68.15 89.1278H59.5722V90.5056H68.15V91.4222H80.0944V88.2056H68.15V89.1278ZM13.9389 69.9833H80.0944V14.0889H13.9389V69.9833Z"/></svg>
     </a>
     <a class="ext" id="g-board" href="#">Board</a>
-    <a class="ext" id="g-drive" href="#">Drive</a>
-    <a class="ext" id="g-reels" href="#">Reels</a>
-    <a class="ext" id="g-scripts" href="#">Scripts</a>
-    <a class="ext" id="g-docs" href="#">Handbook</a>
     <a class="ext" href="https://www.instagram.com/hardeep_gambhir/">Instagram</a>
   </div>
 </nav>
@@ -31,9 +27,7 @@
     <div class="lnav-r">
       <a href="#scoreboard">Scoreboard</a>
       <a href="#today">Today</a>
-      <a href="#pipeline">Pipeline</a>
-      <a href="#commitments">Commitments</a>
-      <a href="#owners">Owners</a>
+      <a href="#standup">Standup</a>
       <a class="pill" id="l-board" href="#">Edit the board</a>
     </div>
   </div>
@@ -69,26 +63,10 @@
   </section>
 
   <section class="band gray" id="pipeline">
-    <div class="in">
-      <h2>The pipeline.</h2>
-      <p class="lede" id="stagecount"></p>
-      <div class="card scroll"><table class="tbl pipe" id="pipe"></table></div>
-    </div>
-  </section>
-
-  <section class="band" id="commitments">
-    <div class="in">
-      <h2>Commitments.</h2>
-      <p class="lede">If you say you'll do it, it's on here.</p>
-      <div class="seg" id="ownerfilter" role="group" aria-label="Filter by owner"></div>
-      <div class="card scroll line"><table class="tbl com" id="com"></table></div>
-    </div>
-  </section>
-
-  <section class="band gray" id="owners">
-    <div class="in">
-      <h2>Who owns what.</h2>
-      <div class="card scroll"><table class="tbl own" id="own"></table></div>
+    <div class="in" id="standup">
+      <h2>Standup.</h2>
+      <p class="lede">Yesterday, today, blockers. From the morning call.</p>
+      <div class="card scroll"><table class="tbl pipe" id="standuptbl"></table></div>
     </div>
   </section>
 </main>

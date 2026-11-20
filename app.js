@@ -255,6 +255,20 @@ function renderOwn(st) {
   document.getElementById("own").innerHTML = h + "</tbody>";
 }
 
+function renderStandup(st) {
+  const rows = st.board.Standup || [];
+  if (!rows.length) {
+    document.getElementById("standuptbl").innerHTML = `<tbody><tr><td class="dim">Nothing logged yet. Fills in after the morning call.</td></tr></tbody>`;
+    return;
+  }
+  let h = `<thead><tr>${["Date", "Person", "Yesterday", "Today", "Blocker"].map(x => `<th scope="col">${x}</th>`).join("")}</tr></thead><tbody>`;
+  for (const r of rows.slice().reverse()) {
+    h += `<tr><td class="num">${esc(r.Date)}</td><td><strong>${esc(r.Person)}</strong></td><td>${esc(r.Yesterday)}</td><td>${esc(r.Today)}</td>`
+      + `<td class="${r.Blocker ? "need" : "dim"}">${esc(r.Blocker) || "None"}</td></tr>`;
+  }
+  document.getElementById("standuptbl").innerHTML = h + "</tbody>";
+}
+
 async function load(fresh) {
   if (document.activeElement && document.activeElement.classList.contains("editable")) return;
   try {
@@ -263,13 +277,11 @@ async function load(fresh) {
     if (!st.board) throw new Error(st.error || "no data yet");
     last = st;
     ["h-board", "l-board", "f-board", "g-board"].forEach(id => document.getElementById(id).href = st.sheet_url);
-    ["h-drive", "g-drive"].forEach(id => document.getElementById(id).href = st.drive_url);
-    const L = st.links || {};
-    [["g-reels", L.reels], ["g-scripts", L.scripts], ["g-docs", L.docs]].forEach(([id, u]) => { if (u) document.getElementById(id).href = u; });
+    [["h-drive", st.drive_url]].forEach(([id, u]) => { if (document.getElementById(id)) document.getElementById(id).href = u; });
     const day = Math.min(61, Math.max(1, istDay(Date.now()) - istDay(START) + 1));
     const left = Math.max(0, istDay(END) - istDay(Date.now()));
     document.getElementById("dayline").textContent = `Day ${day}. Ends Jan 17, 2027.`;
-    renderScore(st); renderGaps(st); renderPipe(st); renderCom(st); renderOwn(st);
+    renderScore(st); renderGaps(st); renderStandup(st);
     document.getElementById("sync").textContent = (st.error ? "The sheet did not answer, so this is the last good copy. " : "")
       + `Synced from the board ${new Date(st.synced_at * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" })} IST.`;
     if (st.rules && st.rules.length) document.getElementById("footrules").textContent = st.rules.join(" ") + " This page mirrors the board and follows it within 30 seconds.";

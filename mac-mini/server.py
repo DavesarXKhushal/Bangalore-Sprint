@@ -31,7 +31,7 @@ _cache = {"board": None, "board_at": 0, "error": None, "ig": None, "ig_at": 0, "
 
 def fetch_sheet():
     params = {"spreadsheetId": SHEET_ID,
-              "ranges": ["Scoreboard!A1:Z60", "Priorities!A1:Z60", "Pipeline!A1:Z200", "Commitments!A1:Z500", "Owners!A1:Z100"],
+              "ranges": ["Scoreboard!A1:Z60", "Priorities!A1:Z60", "Standup!A1:Z200"],
               "valueRenderOption": "FORMATTED_VALUE"}
     for attempt in range(3):  # Google connections on this network reset now and then; retry before giving up
         r = subprocess.run([GWS, "sheets", "spreadsheets", "values", "batchGet", "--params", json.dumps(params)],
