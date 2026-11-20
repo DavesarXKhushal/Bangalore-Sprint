@@ -144,7 +144,7 @@ function computeGaps(st) {
   return g.sort((a, b) => b.sev - a.sev);
 }
 
-const PEOPLE = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas", "Andrew", "Zian", "Kei"];
+const PEOPLE = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas", "Andrew", "Kei"];
 const istTime = iso => new Date(iso).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" });
 function renderGaps(st) {
   const g = computeGaps(st), cal = st.cal || [], now = Date.now();
@@ -167,6 +167,67 @@ function renderGaps(st) {
   document.getElementById("gaps").innerHTML = cards.join("") || `<div class="person"><div class="pname">All clear.</div><div class="pcount">Nothing overdue, nothing missing.</div></div>`;
 }
 
+// --- inline editing: contenteditable spans that PATCH the sheet via /api/edit ---
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._h); toast._h = setTimeout(() => t.classList.remove("show"), 2200);
+}
+async function saveCell(el) {
+  const { sheet, row, header } = el.dataset;
+  const value = el.textContent.trim();
+  el.classList.add("saving");
+  try {
+    const r = await fetch("/api/edit", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sheet, row: +row, header, value }) });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || "save failed");
+    toast("Saved to the sheet.");
+  } catch (e) {
+    toast("Could not save: " + e.message);
+  } finally {
+    el.classList.remove("saving");
+  }
+}
+function editable(sheet, row, header, value, placeholder, extraClass) {
+  const v = esc(value || "");
+  return `<div class="editable ${extraClass || ""}" contenteditable="true" spellcheck="false" data-empty="${!value}"
+    data-sheet="${sheet}" data-row="${row}" data-header="${esc(header)}" data-placeholder="${esc(placeholder || "")}">${v}</div>`;
+}
+function wireEditables(root) {
+  root.querySelectorAll(".editable").forEach(el => {
+    el.addEventListener("focus", () => { el.dataset.before = el.textContent; });
+    el.addEventListener("blur", () => {
+      el.dataset.empty = !el.textContent.trim();
+      if (el.textContent.trim() !== (el.dataset.before || "").trim()) saveCell(el);
+    });
+    el.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); } });
+  });
+}
+
+function renderRules(st) {
+  document.getElementById("rulesrow").innerHTML = (st.rules || [])
+    .map((r, i) => `<span class="rule-item"><b>${i + 1}.</b> ${esc(r)}</span>`).join("");
+}
+
+function renderPriorities(st) {
+  const rows = st.board.Priorities || [];
+  const html = rows.map((p, i) => {
+    const imm = /yes/i.test(p["Immediate?"] || "");
+    return `<div class="pcard">
+      <div class="pname">${esc(p.Person)}</div>
+      <span class="pbadge ${imm ? "now" : "later"}">${imm ? "Immediate" : "On track"}</span>
+      <div class="prow"><div class="plabel">Right now</div>${editable("Priorities", i, "Right now", p["Right now"], "What are they doing right now")}</div>
+      <div class="prow"><div class="plabel">Today's one thing</div>${editable("Priorities", i, "Today's one thing", p["Today's one thing"], "The one thing that has to ship today")}</div>
+      <div class="prow"><div class="plabel">Delaying on</div>${editable("Priorities", i, "Delaying on / blocked", p["Delaying on / blocked"], "Nothing right now")}</div>
+      <div class="prow"><div class="plabel">Deadline today</div>${editable("Priorities", i, "Deadline today", p["Deadline today"], "No deadline set")}</div>
+    </div>`;
+  }).join("");
+  const grid = document.getElementById("priorities-grid");
+  grid.innerHTML = html || `<p class="lede">Nothing in the Priorities tab yet.</p>`;
+  wireEditables(grid);
+}
+
 function renderPipe(st) {
   const pipe = st.board.Pipeline || [], now = Date.now();
   const nextSlot = pipe.find(p => !/^posted/i.test(p.Stage || "") && (parseDate(p["Planned post"]) || 0) >= now);
@@ -174,22 +235,24 @@ function renderPipe(st) {
   pipe.forEach(p => counts[p.Stage || "Idea"] = (counts[p.Stage || "Idea"] || 0) + 1);
   const posted = counts["Posted"] || 0;
   document.getElementById("stagecount").textContent = `${pipe.length} slots. ${posted} posted. ` + STAGE_ORDER.filter(s => counts[s] && s !== "Posted").map(s => `${counts[s]} at ${s.toLowerCase()}`).join(", ") + ".";
-  const head = ["Slot", "Posts", "Idea", "Stage", "Team", "Script", "Edit folder", "Post", "3s hold", "Avg watch", "Shares", "Saves", "Follows", "Repeat", "Drop"];
+  const head = ["Slot", "Posts", "Idea", "Stage", "Team", "Script", "Edit folder", "Post", "Notes / blocker", "3s hold", "Avg watch", "Shares", "Saves", "Follows", "Repeat", "Drop"];
   let h = `<thead><tr>${head.map(x => `<th scope="col">${x}</th>`).join("")}</tr></thead><tbody>`;
-  for (const p of pipe) {
+  for (const [i, p] of pipe.entries()) {
     const t = parseDate(p["Planned post"]), idx = stageIdx(p.Stage);
     const missed = t && t < now && idx < 5;
     const cell = (u, label, need) => u ? `<td>${link(u, label).replace("<a ", '<a class="go" ')}</td>` : `<td class="${need ? "need" : "dim"}">${need ? "Missing" : "None"}</td>`;
     h += `<tr class="${p === nextSlot ? "next" : ""}">`
       + `<td class="num">${esc(p.Slot)}</td><td class="num">${esc((p["Planned post"] || "").replace(/,?\s*10:30 PM IST/, ""))}${p === nextSlot ? '<span class="sub">Next up</span>' : missed ? '<span class="sub">Missed</span>' : ""}</td>`
-      + `<td>${esc(p["Title / idea"]) || '<span class="dim">No idea yet</span>'}</td>`
-      + `<td><span class="stage ${stageClass(p.Stage)}">${esc(p.Stage || "Idea")}</span></td>`
-      + `<td>${esc([p["Idea + camera (Hardeep)"], p["Script (Andrew)"], p["Build (Sanchay)"], p["Edit (Zian)"]].filter(Boolean).join(", "))}</td>`
+      + `<td>${editable("Pipeline", i, "Title / idea", p["Title / idea"], "No idea yet")}</td>`
+      + `<td>${editable("Pipeline", i, "Stage", p.Stage || "Idea", "Idea")}</td>`
+      + `<td>Hardeep, Andrew, Sanchay</td>`
       + cell(p["Script link"], "Script", idx >= 2) + cell(p["Edit folder"], "Folder", idx >= 3) + cell(p["Post link"], "Post", idx >= 5)
+      + `<td class="notes">${editable("Pipeline", i, "Notes / blocker", p["Notes / blocker"], "No blocker")}</td>`
       + ["3 sec hold %", "Avg watch (s)", "Shares", "Saves", "Follows"].map(k => `<td class="num">${esc(p[k])}</td>`).join("")
       + `<td>${esc(p["Repeat next time"])}</td><td>${esc(p["Drop next time"])}</td></tr>`;
   }
   document.getElementById("pipe").innerHTML = h + "</tbody>";
+  wireEditables(document.getElementById("pipe"));
 }
 
 function renderCom(st) {
@@ -217,6 +280,7 @@ function renderOwn(st) {
 }
 
 async function load(fresh) {
+  if (document.activeElement && document.activeElement.classList.contains("editable")) return; // don't clobber an in-progress edit
   try {
     const r = await fetch("/api/board" + (fresh ? "?fresh=1" : ""), { cache: "no-store" });
     const st = await r.json();
@@ -229,7 +293,7 @@ async function load(fresh) {
     const day = Math.min(61, Math.max(1, istDay(Date.now()) - istDay(START) + 1));
     const left = Math.max(0, istDay(END) - istDay(Date.now()));
     document.getElementById("dayline").textContent = `Day ${day}. Ends Jan 17, 2027.`;
-    renderScore(st); renderGaps(st); renderPipe(st); renderCom(st); renderOwn(st);
+    renderScore(st); renderRules(st); renderGaps(st); renderPriorities(st); renderPipe(st); renderCom(st); renderOwn(st);
     document.getElementById("sync").textContent = (st.error ? "The sheet did not answer, so this is the last good copy. " : "")
       + `Synced from the board ${new Date(st.synced_at * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" })} IST.`;
   } catch (e) {
