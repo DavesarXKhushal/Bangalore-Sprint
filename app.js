@@ -272,6 +272,7 @@ async function load(fresh) {
     renderScore(st); renderGaps(st); renderPipe(st); renderCom(st); renderOwn(st);
     document.getElementById("sync").textContent = (st.error ? "The sheet did not answer, so this is the last good copy. " : "")
       + `Synced from the board ${new Date(st.synced_at * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" })} IST.`;
+    if (st.rules && st.rules.length) document.getElementById("footrules").textContent = st.rules.join(" ") + " This page mirrors the board and follows it within 30 seconds.";
   } catch (e) {
     document.getElementById("sync").textContent = "Could not reach the board: " + e.message;
   }

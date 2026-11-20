@@ -91,9 +91,8 @@ TEAM = {"hardeep@localhosthq.com": "Hardeep", "khushal.davesar@localhosthq.com":
 CAL_HIDE = re.compile(r"\b(sleep|finance|cash|equity|payroll|salary|personal|doctor|lawyer|visa)\b", re.I)
 IST = 5.5 * 3600
 RULES = [
-    "The day starts at 8 with the call with Andrew.",
-    "Everyone is in the office by 8. No exceptions.",
-    "No working from the Airbnb. Food is sorted at the office, not a reason to leave.",
+    "Andrew's call is at 8 am. Everyone's awake and on it, no exceptions.",
+    "Bunk beds are at the office if you want to crash there. Otherwise, just be in by 8.",
     "No meetings before 7 PM. Work until then.",
 ]
 # Editable cells: sheet tab -> header name -> column letter, and the first data row number
