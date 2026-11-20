@@ -127,6 +127,7 @@ h2 { font-size: 48px; line-height: 1.08; font-weight: 600; letter-spacing: -0.00
 .editable[data-empty="true"]:not(:focus) { color: var(--ink-3); }
 .editable[data-empty="true"]:not(:focus)::before { content: attr(data-placeholder); }
 .pnow { font-size: 15px; color: var(--ink-2); margin-top: 4px; letter-spacing: -0.016em; }
+.pnext { font-size: 14px; color: var(--ink-3); margin-top: 6px; letter-spacing: -0.016em; }
 
 /* toast */
 .toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 14px); background: var(--ink); color: var(--white); font-size: 13px; padding: 8px 16px; border-radius: 980px; opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 80; }

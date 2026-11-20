@@ -139,7 +139,7 @@ function computeGaps(st) {
   return g.sort((a, b) => b.sev - a.sev);
 }
 
-const PEOPLE = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas", "Andrew", "Kei"];
+const PEOPLE = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas"];
 const istTime = iso => new Date(iso).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" });
 
 // --- inline editing: contenteditable fields that save to the sheet via /api/edit ---
@@ -180,28 +180,16 @@ function wireEditables(root) {
 }
 
 function renderGaps(st) {
-  const g = computeGaps(st), cal = st.cal || [], now = Date.now();
   const pr = {};
   (st.board.Priorities || []).forEach((p, i) => { pr[p.Person] = { ...p, row: i }; });
-  const names = [...new Set([...PEOPLE, ...g.map(x => x.who), ...cal.flatMap(e => e.people), ...Object.keys(pr)])]
-    .filter(n => g.some(x => x.who === n) || cal.some(e => e.people.includes(n)) || pr[n]);
-  const cards = names.map(n => {
-    const items = g.filter(x => x.who === n);
-    const evs = cal.filter(e => e.people.includes(n));
-    const p = pr[n];
-    const evHtml = evs.map(e => {
-      const past = !e.allDay && new Date(e.end).getTime() < now;
-      const carried = !e.allDay && istDay(new Date(e.start).getTime()) < istDay(now);
-      return `<li class="ev ${past ? "past" : ""}"><span class="t">${e.allDay ? "All day" : carried ? "Until " + istTime(e.end) : istTime(e.start)}</span><span>${esc(e.title)}</span></li>`;
-    }).join("");
+  const cards = PEOPLE.map(n => {
+    const p = pr[n] || {};
     return `<div class="person"><div class="pname">${esc(n)}</div>`
-      + (p ? `<div class="pnow">${editable("Priorities", p.row, "Right now", p["Right now"], "What they're on right now")}</div>` : "")
-      + `<div class="pcount">${items.length ? `${items.length} to act on` : "Nothing flagged"}${evs.length ? `. ${evs.length} on the calendar` : ""}</div>`
-      + (items.length ? `<ul class="acts">${items.map(x => `<li>${x.what}</li>`).join("")}</ul>` : "")
-      + (evs.length ? `<div class="calhead">Calendar today, IST</div><ul class="cal">${evHtml}</ul>` : "")
+      + `<div class="pnow">${editable("Priorities", p.row, "Right now", p["Right now"], "What they're on right now")}</div>`
+      + `<div class="pnext">${editable("Priorities", p.row, "Today's one thing", p["Today's one thing"], "Today's one thing")}</div>`
       + `</div>`;
   });
-  document.getElementById("gaps").innerHTML = cards.join("") || `<div class="person"><div class="pname">All clear.</div><div class="pcount">Nothing overdue, nothing missing.</div></div>`;
+  document.getElementById("gaps").innerHTML = cards.join("");
   wireEditables(document.getElementById("gaps"));
 }
 
