@@ -7,7 +7,7 @@
 <title>Bangalore Sprint - LocalHost</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -15,7 +15,6 @@
   <div class="gnav-in">
     <a class="logo" href="#top" aria-label="LocalHost">
       <svg viewBox="0 0 94 100" aria-hidden="true"><path fill="currentColor" d="M94.0278 100H0V0H94.0278V100ZM13.9389 91.4222H25.8833V88.2056H13.9389V91.4222ZM68.15 89.1278H59.5722V90.5056H68.15V91.4222H80.0944V88.2056H68.15V89.1278ZM13.9389 69.9833H80.0944V14.0889H13.9389V69.9833Z"/></svg>
-      <span>Bangalore Sprint</span>
     </a>
     <a class="ext" id="g-board" href="#">Board</a>
     <a class="ext" id="g-drive" href="#">Drive</a>
@@ -28,21 +27,20 @@
 
 <div class="lnav" id="lnav">
   <div class="lnav-in">
-    <div class="lnav-l">
-      <a href="#today">Today</a>
-      <a href="#priorities">Priorities</a>
+    <span class="lnav-title">Bangalore Sprint</span>
+    <div class="lnav-r">
       <a href="#scoreboard">Scoreboard</a>
+      <a href="#today">Today</a>
       <a href="#pipeline">Pipeline</a>
       <a href="#commitments">Commitments</a>
       <a href="#owners">Owners</a>
+      <a class="pill" id="l-board" href="#">Edit the board</a>
     </div>
-    <a class="pill" id="l-board" href="#">Edit the board</a>
   </div>
 </div>
 
 <main id="top">
   <section class="hero">
-    <p class="kicker">LocalHost, Bangalore</p>
     <h1>Bangalore Sprint</h1>
     <p class="tag">One office. 60 days. No plan B.</p>
     <p class="day" id="dayline">Nov 17, 2026 to Jan 17, 2027</p>
@@ -54,9 +52,11 @@
     <noscript><p class="sync">This page needs JavaScript to read the live board.</p></noscript>
   </section>
 
-  <section class="band rules" id="rules">
+  <section class="band gray" id="scoreboard">
     <div class="in">
-      <div class="rules-row" id="rulesrow"></div>
+      <h2>The scoreboard.</h2>
+      <div class="tiles" id="score"></div>
+      <div class="tiles two" id="flags"></div>
     </div>
   </section>
 
@@ -65,22 +65,6 @@
       <h2>Needs attention today.</h2>
       <p class="lede">Everyone's open items from the board, next to their calendar for today.</p>
       <div class="people" id="gaps"></div>
-    </div>
-  </section>
-
-  <section class="band gray" id="priorities">
-    <div class="in">
-      <div class="sechead"><h2>Right now.</h2><span class="hint">Click any field to edit. It saves straight to the sheet.</span></div>
-      <p class="lede">Who's on what, this minute.</p>
-      <div class="priority-grid" id="priorities-grid"></div>
-    </div>
-  </section>
-
-  <section class="band" id="scoreboard">
-    <div class="in">
-      <h2>The scoreboard.</h2>
-      <div class="tiles" id="score"></div>
-      <div class="tiles two" id="flags"></div>
     </div>
   </section>
 
@@ -111,7 +95,7 @@
 
 <footer class="foot">
   <div class="in">
-    <p>This page mirrors the Bangalore Sprint Board. Change the sheet, or edit directly on this page, and both follow within 30 seconds. Instagram followers are read live from instagram.com/hardeep_gambhir.</p>
+    <p>This page mirrors the Bangalore Sprint Board. Change the sheet and this page follows within 30 seconds. Instagram followers are read live from instagram.com/hardeep_gambhir.</p>
     <div class="foot-b"><span>LocalHost, Bangalore</span><a id="f-board" href="#">Edit the board</a></div>
   </div>
 </footer>
