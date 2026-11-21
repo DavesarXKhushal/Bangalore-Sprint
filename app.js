@@ -243,6 +243,31 @@ function renderOwn(st) {
   document.getElementById("own").innerHTML = h + "</tbody>";
 }
 
+const STAGES = ["Idea", "Script", "Build / Shoot", "Edit", "Finished (banked)", "Posted"];
+const STAGE_CLASS = { "Idea": "st-idea", "Script": "st-script", "Build / Shoot": "st-shoot", "Edit": "st-edit",
+                       "Finished (banked)": "st-fin", "Posted": "st-posted" };
+
+function renderBoard(st) {
+  const rows = (st.board.Pipeline || []).map((r, i) => ({ ...r, row: i }));
+  const cols = STAGES.map(stage => {
+    const items = rows.filter(r => (r.Stage || "Idea") === stage);
+    const cards = items.map(r => {
+      const links = [["Script", r["Script link"]], ["Draft", r["Draft 1"]], ["Edit folder", r["Edit folder"]], ["Post", r["Post link"]]]
+        .filter(([, u]) => u).map(([label, u]) => `<a class="lk" href="${esc(u)}" target="_blank" rel="noopener">${label}</a>`).join("");
+      return `<div class="vcard">
+        <div class="vtitle">${esc(r["Title / idea"]) || "<span class=\"dim\">Untitled, slot " + esc(r.Slot) + "</span>"}</div>
+        <div class="vmeta">${esc(r["Planned post"] || "")}</div>
+        <div class="vonit">${editable("Pipeline", r.row, "On it", r["On it"], "Who's on it")}</div>
+        ${r["Notes / blocker"] ? `<div class="vnote">${esc(r["Notes / blocker"])}</div>` : ""}
+        ${links ? `<div class="vlinks">${links}</div>` : ""}
+      </div>`;
+    }).join("") || `<div class="vempty">Nothing here</div>`;
+    return `<div class="scol"><div class="shead ${STAGE_CLASS[stage]}">${stage}<span class="scount">${items.length}</span></div>${cards}</div>`;
+  }).join("");
+  document.getElementById("board").innerHTML = cols;
+  wireEditables(document.getElementById("board"));
+}
+
 function renderStandup(st) {
   const rows = st.board.Standup || [];
   if (!rows.length) {
@@ -269,7 +294,7 @@ async function load(fresh) {
     const day = Math.min(61, Math.max(1, istDay(Date.now()) - istDay(START) + 1));
     const left = Math.max(0, istDay(END) - istDay(Date.now()));
     document.getElementById("dayline").textContent = `Day ${day}. Ends Jan 17, 2027.`;
-    renderScore(st); renderGaps(st); renderStandup(st);
+    renderScore(st); renderGaps(st); renderBoard(st); renderStandup(st);
     document.getElementById("sync").textContent = (st.error ? "The sheet did not answer, so this is the last good copy. " : "")
       + `Synced from the board ${new Date(st.synced_at * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" })} IST.`;
     if (st.rules && st.rules.length) document.getElementById("footrules").textContent = st.rules.join(" ") + " This page mirrors the board and follows it within 30 seconds.";

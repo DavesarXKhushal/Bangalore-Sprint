@@ -31,7 +31,7 @@ _cache = {"board": None, "board_at": 0, "error": None, "ig": None, "ig_at": 0, "
 
 def fetch_sheet():
     params = {"spreadsheetId": SHEET_ID,
-              "ranges": ["Scoreboard!A1:Z60", "Priorities!A1:Z60", "Standup!A1:Z200"],
+              "ranges": ["Scoreboard!A1:Z60", "Priorities!A1:Z60", "Standup!A1:Z200", "Pipeline!A1:Z40"],
               "valueRenderOption": "FORMATTED_VALUE"}
     for attempt in range(3):  # Google connections on this network reset now and then; retry before giving up
         r = subprocess.run([GWS, "sheets", "spreadsheets", "values", "batchGet", "--params", json.dumps(params)],
@@ -99,7 +99,7 @@ RULES = [
 EDITABLE = {
     "Priorities": {"first_row": 2, "cols": {"Right now": "B", "Today's one thing": "C", "Delaying on / blocked": "D",
                                              "Immediate?": "E", "Deadline today": "F"}},
-    "Pipeline": {"first_row": 2, "cols": {"Title / idea": "C", "Stage": "D", "Notes / blocker": "H"}},
+    "Pipeline": {"first_row": 2, "cols": {"Title / idea": "C", "Stage": "D", "On it": "E", "Notes / blocker": "J"}},
 }
 
 
