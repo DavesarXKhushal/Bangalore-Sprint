@@ -268,18 +268,28 @@ function renderBoard(st) {
   wireEditables(document.getElementById("board"));
 }
 
+const SU_ORDER = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas"];
+
 function renderStandup(st) {
   const rows = st.board.Standup || [];
   if (!rows.length) {
-    document.getElementById("standuptbl").innerHTML = `<tbody><tr><td class="dim">Nothing logged yet. Fills in after the morning call.</td></tr></tbody>`;
+    document.getElementById("standuptbl").innerHTML = `<div class="dim">Nothing logged yet. Fills in after the morning call.</div>`;
     return;
   }
-  let h = `<thead><tr>${["Date", "Person", "Yesterday", "Today", "Blocker"].map(x => `<th scope="col">${x}</th>`).join("")}</tr></thead><tbody>`;
-  for (const r of rows.slice().reverse()) {
-    h += `<tr><td class="num">${esc(r.Date)}</td><td><strong>${esc(r.Person)}</strong></td><td>${esc(r.Yesterday)}</td><td>${esc(r.Today)}</td>`
-      + `<td class="${r.Blocker ? "need" : "dim"}">${esc(r.Blocker) || "None"}</td></tr>`;
-  }
-  document.getElementById("standuptbl").innerHTML = h + "</tbody>";
+  const latest = {};
+  rows.forEach(r => { latest[r.Person] = r; });  // sheet is append-order, so last wins
+  const order = [...SU_ORDER, ...Object.keys(latest).filter(p => !SU_ORDER.includes(p))];
+  const cards = order.filter(p => latest[p]).map(p => {
+    const r = latest[p];
+    const hasBlock = r.Blocker && r.Blocker.toLowerCase() !== "none";
+    return `<div class="sucard">
+      <div class="suhead"><span class="suname">${esc(p)}</span><span class="sudate">${esc(r.Date)}</span></div>
+      <div class="surow"><span class="sulabel">Yesterday</span><span>${esc(r.Yesterday) || "&mdash;"}</span></div>
+      <div class="surow"><span class="sulabel">Today</span><span>${esc(r.Today) || "&mdash;"}</span></div>
+      <div class="surow"><span class="sulabel">Blocker</span><span class="${hasBlock ? "sublock" : "dim"}">${esc(r.Blocker) || "None"}</span></div>
+    </div>`;
+  }).join("");
+  document.getElementById("standuptbl").innerHTML = `<div class="sugrid">${cards}</div>`;
 }
 
 async function load(fresh) {
