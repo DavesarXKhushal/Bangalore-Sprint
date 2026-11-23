@@ -329,6 +329,34 @@ function deleteTask(row) {
   toast("Deleted.");
   postDeleteTask(row);
 }
+// Right-click context menu: one item for now (Delete), built fresh each time, closes on outside click/Escape/scroll.
+let openMenu = null;
+function closeCalMenu() {
+  if (openMenu) { openMenu.remove(); openMenu = null; }
+  document.removeEventListener("click", closeCalMenu);
+  document.removeEventListener("scroll", closeCalMenu, true);
+  document.removeEventListener("keydown", onCalMenuKey);
+}
+function onCalMenuKey(e) { if (e.key === "Escape") closeCalMenu(); }
+function openCalMenu(e, row) {
+  closeCalMenu();
+  const menu = document.createElement("div");
+  menu.className = "cal-menu";
+  menu.innerHTML = `<button type="button" class="cal-menu-item danger">Delete</button>`;
+  document.body.appendChild(menu);
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  const x = Math.min(e.clientX, window.innerWidth - mw - 8);
+  const y = Math.min(e.clientY, window.innerHeight - mh - 8);
+  menu.style.left = x + "px";
+  menu.style.top = y + "px";
+  menu.querySelector(".danger").onclick = ev => { ev.stopPropagation(); closeCalMenu(); deleteTask(row); };
+  openMenu = menu;
+  setTimeout(() => {
+    document.addEventListener("click", closeCalMenu);
+    document.addEventListener("scroll", closeCalMenu, true);
+    document.addEventListener("keydown", onCalMenuKey);
+  }, 0);
+}
 function openCalAdd(cell) {
   if (cell.querySelector(".cal-form")) { cell.querySelector(".cal-form input").focus(); return; }
   const date = cell.dataset.date;
@@ -346,7 +374,7 @@ function openCalAdd(cell) {
     if (!text) { form.remove(); return; }
     const coms = last.board.Commitments || (last.board.Commitments = []);
     const row = coms.length;
-    coms.push({ "#": String(row + 1), Owner: "Unassigned", Commitment: text, Due: date, Status: "Not started", row });
+    coms.push({ "#": String(row + 1), Owner: "", Commitment: text, Due: date, Status: "Not started", row });
     renderCalendar(last);  // show it instantly, the write happens behind this
     postAddTask(date, text, "");
   });
@@ -410,7 +438,7 @@ function wireCalendar() {
   });
   document.querySelectorAll(".cal-task").forEach(chip => {
     chip.addEventListener("pointerdown", e => { if (e.button !== 0 && e.pointerType === "mouse") return; e.stopPropagation(); startDrag(e, chip); });
-    chip.addEventListener("contextmenu", e => { e.preventDefault(); deleteTask(+chip.dataset.row); });
+    chip.addEventListener("contextmenu", e => { e.preventDefault(); e.stopPropagation(); openCalMenu(e, +chip.dataset.row); });
     chip.addEventListener("click", e => e.stopPropagation());
   });
 }
@@ -434,7 +462,10 @@ function renderCalendar(st) {
     const tasks = byDay[key] || [];
     const isToday = key === todayKey;
     const inSprint = key >= SPRINT_START_KEY && key <= SPRINT_END_KEY;
-    const chips = tasks.map(c => `<div class="cal-task" data-row="${c.row}" title="Drag to move, right-click to delete">${esc(c.Owner || "")}${c.Owner ? ": " : ""}${esc(c.Commitment || "")}</div>`).join("");
+    const chips = tasks.map(c => {
+      const owner = c.Owner && c.Owner !== "Unassigned" ? `${esc(c.Owner)}: ` : "";
+      return `<div class="cal-task" data-row="${c.row}" title="Drag to move, right-click for options">${owner}${esc(c.Commitment || "")}</div>`;
+    }).join("");
     return `<div class="cal-cell${isToday ? " today" : ""}${inSprint ? "" : " out"}" data-date="${key}">
       <div class="cal-num">${d}</div>
       <div class="cal-tasks">${chips}</div>

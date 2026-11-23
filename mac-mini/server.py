@@ -187,7 +187,7 @@ def add_task(due_iso, text, owner):
     logged = time.strftime("%Y-%m-%d", time.gmtime(time.time() + IST))
     params = {"spreadsheetId": SHEET_ID, "range": "Commitments!A1", "valueInputOption": "USER_ENTERED",
               "insertDataOption": "INSERT_ROWS"}
-    row = [str(next_n), (owner or "").strip() or "Unassigned", text, due_label, "", "Not started", "", logged, "Added from the calendar"]
+    row = [str(next_n), (owner or "").strip(), text, due_label, "", "Not started", "", logged, "Added from the calendar"]
     r = subprocess.run([GWS, "sheets", "spreadsheets", "values", "append", "--params", json.dumps(params),
                         "--json", json.dumps({"values": [row]})], capture_output=True, text=True, timeout=30)
     out = "\n".join(l for l in r.stdout.splitlines() if not l.startswith("Using keyring"))

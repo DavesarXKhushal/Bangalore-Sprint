@@ -214,6 +214,10 @@ tr.next td { background: var(--gray); }
 .cal-task { font-size: 11px; line-height: 1.35; background: var(--gray); color: var(--ink); border-radius: 6px; padding: 3px 5px; cursor: grab; overflow-wrap: break-word; touch-action: none; user-select: none; }
 .cal-task.dragging { opacity: 0.35; }
 .cal-ghost { position: fixed; z-index: 999; pointer-events: none; opacity: 0.92; transform: rotate(-1deg) scale(1.03); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); font-size: 11px; line-height: 1.35; background: var(--blue); color: #fff; border-radius: 6px; padding: 3px 5px; cursor: grabbing; }
+.cal-menu { position: fixed; z-index: 1000; background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18); padding: 4px; min-width: 120px; }
+.cal-menu-item { display: block; width: 100%; text-align: left; font: inherit; font-size: 13px; background: transparent; border: 0; border-radius: 6px; padding: 7px 10px; cursor: pointer; color: var(--ink); }
+.cal-menu-item:hover { background: var(--gray); }
+.cal-menu-item.danger { color: #d70015; }
 .cal-cell.today .cal-task { background: rgba(255, 255, 255, 0.25); color: #fff; }
 .cal-add { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; border: 0; background: var(--track); color: var(--ink-2); font-size: 13px; line-height: 18px; text-align: center; padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.15s ease; }
 .cal-cell:hover .cal-add, .cal-cell:focus-within .cal-add { opacity: 1; }
