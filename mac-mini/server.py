@@ -101,6 +101,7 @@ EDITABLE = {
     "Priorities": {"first_row": 2, "cols": {"Right now": "B", "Today's one thing": "C", "Delaying on / blocked": "D",
                                              "Immediate?": "E", "Deadline today": "F"}},
     "Pipeline": {"first_row": 2, "cols": {"Title / idea": "C", "Stage": "D", "On it": "E", "Notes / blocker": "J"}},
+    "Commitments": {"first_row": 2, "cols": {"Due": "D"}},  # calendar drag-and-drop moves a deadline's date
 }
 
 

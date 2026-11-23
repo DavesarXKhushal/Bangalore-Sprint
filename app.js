@@ -268,15 +268,47 @@ function renderBoard(st) {
   wireEditables(document.getElementById("board"));
 }
 
-// --- Nov-Jan calendar: click a day to drop in a deadline (writes to Commitments) ---
+// --- Nov-Jan calendar: one month at a time, arrows to page, drag a task to move its date ---
 const CAL_MONTHS = [[2026, 10, "November"], [2026, 11, "December"], [2027, 0, "January"]];
 const SPRINT_START_KEY = "2026-11-17", SPRINT_END_KEY = "2027-01-17";
+const WD3 = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const istYMD = ms => { const dt = new Date(ms + 5.5 * 36e5); return { y: dt.getUTCFullYear(), m: dt.getUTCMonth(), d: dt.getUTCDate() }; };
 const ymdKey = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+const dueLabel = (y, m, d) => `${WD3[new Date(Date.UTC(y, m, d)).getUTCDay()]} ${MON3[m]} ${d}`;
 function monthCells(y, m) {
   const startDow = new Date(Date.UTC(y, m, 1)).getUTCDay();
   const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
   return [...Array(startDow).fill(null), ...Array(days).keys()].map((v, i) => i < startDow ? null : v - startDow + 1);
+}
+let calMonthIdx = null;
+function calDefaultMonth() {
+  const { y, m } = istYMD(Date.now());
+  const i = CAL_MONTHS.findIndex(([cy, cm]) => cy === y && cm === m);
+  return i >= 0 ? i : 0;
+}
+function navCal(delta) {
+  calMonthIdx = Math.min(CAL_MONTHS.length - 1, Math.max(0, calMonthIdx + delta));
+  renderCalendar(last);
+}
+// Writes go out in the background; the grid updates immediately so there's no wait on Enter or drop.
+async function postAddTask(due, text, owner) {
+  try {
+    const r = await fetch("/api/add-task", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due, text, owner }) });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || "save failed");
+  } catch (err) {
+    toast("Could not save: " + err.message);
+  }
+}
+async function postMoveTask(row, due) {
+  try {
+    const r = await fetch("/api/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sheet: "Commitments", row, header: "Due", value: due }) });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || "save failed");
+  } catch (err) {
+    toast("Could not move it: " + err.message);
+    load(true);
+  }
 }
 function openCalAdd(cell) {
   if (cell.querySelector(".cal-form")) { cell.querySelector(".cal-form input").focus(); return; }
@@ -288,33 +320,47 @@ function openCalAdd(cell) {
   const input = form.querySelector("input");
   input.focus();
   input.addEventListener("click", e => e.stopPropagation());
-  input.addEventListener("keydown", async e => {
+  input.addEventListener("keydown", e => {
     if (e.key === "Escape") { form.remove(); return; }
     if (e.key !== "Enter") return;
     const text = input.value.trim();
     if (!text) { form.remove(); return; }
-    input.disabled = true;
-    try {
-      const r = await fetch("/api/add-task", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ due: date, text, owner: "" }) });
-      const d = await r.json();
-      if (!r.ok || d.error) throw new Error(d.error || "save failed");
-      toast("Added.");
-      load(true);
-    } catch (err) {
-      toast("Could not add: " + err.message);
-      input.disabled = false;
-    }
+    const coms = last.board.Commitments || (last.board.Commitments = []);
+    const row = coms.length;
+    coms.push({ "#": String(row + 1), Owner: "Unassigned", Commitment: text, Due: date, Status: "Not started", row });
+    renderCalendar(last);  // show it instantly, the write happens behind this
+    postAddTask(date, text, "");
   });
   input.addEventListener("blur", () => setTimeout(() => { if (document.body.contains(form) && document.activeElement !== input) form.remove(); }, 150));
 }
 function wireCalendar() {
+  document.getElementById("cal-prev").onclick = () => navCal(-1);
+  document.getElementById("cal-next").onclick = () => navCal(1);
   document.querySelectorAll(".cal-cell:not(.empty)").forEach(cell => {
     cell.addEventListener("click", e => { if (!e.target.closest(".cal-task") && !e.target.closest(".cal-form")) openCalAdd(cell); });
+    cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
+    cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
+    cell.addEventListener("drop", e => {
+      e.preventDefault();
+      cell.classList.remove("drag-over");
+      const row = +e.dataTransfer.getData("text/plain");
+      const key = cell.dataset.date;
+      const c = (last.board.Commitments || []).find(x => x.row === row);
+      if (!c || !key) return;
+      const [y, m, d] = key.split("-").map(Number);
+      c.Due = dueLabel(y, m - 1, d);
+      renderCalendar(last);
+      postMoveTask(row, c.Due);
+    });
+  });
+  document.querySelectorAll(".cal-task").forEach(chip => {
+    chip.addEventListener("dragstart", e => { e.dataTransfer.setData("text/plain", chip.dataset.row); chip.classList.add("dragging"); });
+    chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
   });
 }
 function renderCalendar(st) {
-  const coms = st.board.Commitments || [];
+  if (calMonthIdx == null) calMonthIdx = calDefaultMonth();
+  const coms = (st.board.Commitments || []).map((c, i) => ({ ...c, row: c.row ?? i }));
   const byDay = {};
   coms.forEach(c => {
     const t = parseDate(c.Due, false);
@@ -323,25 +369,28 @@ function renderCalendar(st) {
     (byDay[ymdKey(y, m, d)] = byDay[ymdKey(y, m, d)] || []).push(c);
   });
   const todayKey = (() => { const { y, m, d } = istYMD(Date.now()); return ymdKey(y, m, d); })();
-  const html = CAL_MONTHS.map(([y, m, label]) => {
-    const head = ["S", "M", "T", "W", "T", "F", "S"].map(x => `<div class="cal-dow">${x}</div>`).join("");
-    const body = monthCells(y, m).map(d => {
-      if (d == null) return `<div class="cal-cell empty"></div>`;
-      const key = ymdKey(y, m, d);
-      const tasks = byDay[key] || [];
-      const isToday = key === todayKey;
-      const inSprint = key >= SPRINT_START_KEY && key <= SPRINT_END_KEY;
-      const chips = tasks.slice(0, 3).map(c => `<div class="cal-task" title="${esc(c.Owner || "")}: ${esc(c.Commitment || "")}">${esc(c.Commitment || "")}</div>`).join("");
-      const more = tasks.length > 3 ? `<div class="cal-more">+${tasks.length - 3} more</div>` : "";
-      return `<div class="cal-cell${isToday ? " today" : ""}${inSprint ? "" : " out"}" data-date="${key}">
-        <div class="cal-num">${d}</div>
-        <div class="cal-tasks">${chips}${more}</div>
-        <button type="button" class="cal-add" data-date="${key}" aria-label="Add a deadline on ${key}" onclick="event.stopPropagation();openCalAdd(this.closest('.cal-cell'))">+</button>
-      </div>`;
-    }).join("");
-    return `<div class="cal-month"><div class="cal-mhead">${label} ${y}</div><div class="cal-grid"><div class="cal-dows">${head}</div><div class="cal-days">${body}</div></div></div>`;
+  const [y, m, label] = CAL_MONTHS[calMonthIdx];
+  const head = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(x => `<div class="cal-dow">${x}</div>`).join("");
+  const body = monthCells(y, m).map(d => {
+    if (d == null) return `<div class="cal-cell empty"></div>`;
+    const key = ymdKey(y, m, d);
+    const tasks = byDay[key] || [];
+    const isToday = key === todayKey;
+    const inSprint = key >= SPRINT_START_KEY && key <= SPRINT_END_KEY;
+    const chips = tasks.map(c => `<div class="cal-task" draggable="true" data-row="${c.row}" title="Drag to move">${esc(c.Owner || "")}${c.Owner ? ": " : ""}${esc(c.Commitment || "")}</div>`).join("");
+    return `<div class="cal-cell${isToday ? " today" : ""}${inSprint ? "" : " out"}" data-date="${key}">
+      <div class="cal-num">${d}</div>
+      <div class="cal-tasks">${chips}</div>
+      <button type="button" class="cal-add" data-date="${key}" aria-label="Add a deadline on ${key}" onclick="event.stopPropagation();openCalAdd(this.closest('.cal-cell'))">+</button>
+    </div>`;
   }).join("");
-  document.getElementById("calendar-grid").innerHTML = html;
+  document.getElementById("calendar-grid").innerHTML = `
+    <div class="cal-nav">
+      <button type="button" id="cal-prev" aria-label="Previous month" ${calMonthIdx === 0 ? "disabled" : ""}>&larr;</button>
+      <div class="cal-mhead">${label} ${y}</div>
+      <button type="button" id="cal-next" aria-label="Next month" ${calMonthIdx === CAL_MONTHS.length - 1 ? "disabled" : ""}>&rarr;</button>
+    </div>
+    <div class="cal-grid"><div class="cal-dows">${head}</div><div class="cal-days">${body}</div></div>`;
   wireCalendar();
 }
 
