@@ -268,8 +268,84 @@ function renderBoard(st) {
   wireEditables(document.getElementById("board"));
 }
 
-const SU_ORDER = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas"];
+// --- Nov-Jan calendar: click a day to drop in a deadline (writes to Commitments) ---
+const CAL_MONTHS = [[2026, 10, "November"], [2026, 11, "December"], [2027, 0, "January"]];
+const SPRINT_START_KEY = "2026-11-17", SPRINT_END_KEY = "2027-01-17";
+const istYMD = ms => { const dt = new Date(ms + 5.5 * 36e5); return { y: dt.getUTCFullYear(), m: dt.getUTCMonth(), d: dt.getUTCDate() }; };
+const ymdKey = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+function monthCells(y, m) {
+  const startDow = new Date(Date.UTC(y, m, 1)).getUTCDay();
+  const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return [...Array(startDow).fill(null), ...Array(days).keys()].map((v, i) => i < startDow ? null : v - startDow + 1);
+}
+function openCalAdd(cell) {
+  if (cell.querySelector(".cal-form")) { cell.querySelector(".cal-form input").focus(); return; }
+  const date = cell.dataset.date;
+  const form = document.createElement("div");
+  form.className = "cal-form";
+  form.innerHTML = `<input type="text" placeholder="Add a deadline" maxlength="120">`;
+  cell.appendChild(form);
+  const input = form.querySelector("input");
+  input.focus();
+  input.addEventListener("click", e => e.stopPropagation());
+  input.addEventListener("keydown", async e => {
+    if (e.key === "Escape") { form.remove(); return; }
+    if (e.key !== "Enter") return;
+    const text = input.value.trim();
+    if (!text) { form.remove(); return; }
+    input.disabled = true;
+    try {
+      const r = await fetch("/api/add-task", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ due: date, text, owner: "" }) });
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || "save failed");
+      toast("Added.");
+      load(true);
+    } catch (err) {
+      toast("Could not add: " + err.message);
+      input.disabled = false;
+    }
+  });
+  input.addEventListener("blur", () => setTimeout(() => { if (document.body.contains(form) && document.activeElement !== input) form.remove(); }, 150));
+}
+function wireCalendar() {
+  document.querySelectorAll(".cal-cell:not(.empty)").forEach(cell => {
+    cell.addEventListener("click", e => { if (!e.target.closest(".cal-task") && !e.target.closest(".cal-form")) openCalAdd(cell); });
+  });
+}
+function renderCalendar(st) {
+  const coms = st.board.Commitments || [];
+  const byDay = {};
+  coms.forEach(c => {
+    const t = parseDate(c.Due, false);
+    if (!t) return;
+    const { y, m, d } = istYMD(t);
+    (byDay[ymdKey(y, m, d)] = byDay[ymdKey(y, m, d)] || []).push(c);
+  });
+  const todayKey = (() => { const { y, m, d } = istYMD(Date.now()); return ymdKey(y, m, d); })();
+  const html = CAL_MONTHS.map(([y, m, label]) => {
+    const head = ["S", "M", "T", "W", "T", "F", "S"].map(x => `<div class="cal-dow">${x}</div>`).join("");
+    const body = monthCells(y, m).map(d => {
+      if (d == null) return `<div class="cal-cell empty"></div>`;
+      const key = ymdKey(y, m, d);
+      const tasks = byDay[key] || [];
+      const isToday = key === todayKey;
+      const inSprint = key >= SPRINT_START_KEY && key <= SPRINT_END_KEY;
+      const chips = tasks.slice(0, 3).map(c => `<div class="cal-task" title="${esc(c.Owner || "")}: ${esc(c.Commitment || "")}">${esc(c.Commitment || "")}</div>`).join("");
+      const more = tasks.length > 3 ? `<div class="cal-more">+${tasks.length - 3} more</div>` : "";
+      return `<div class="cal-cell${isToday ? " today" : ""}${inSprint ? "" : " out"}" data-date="${key}">
+        <div class="cal-num">${d}</div>
+        <div class="cal-tasks">${chips}${more}</div>
+        <button type="button" class="cal-add" data-date="${key}" aria-label="Add a deadline on ${key}" onclick="event.stopPropagation();openCalAdd(this.closest('.cal-cell'))">+</button>
+      </div>`;
+    }).join("");
+    return `<div class="cal-month"><div class="cal-mhead">${label} ${y}</div><div class="cal-grid"><div class="cal-dows">${head}</div><div class="cal-days">${body}</div></div></div>`;
+  }).join("");
+  document.getElementById("calendar-grid").innerHTML = html;
+  wireCalendar();
+}
 
+const SU_ORDER = ["Hardeep", "Khushal", "Chandan", "Sanchay", "Suhas"];
 function renderStandup(st) {
   const rows = st.board.Standup || [];
   if (!rows.length) {
@@ -304,7 +380,7 @@ async function load(fresh) {
     const day = Math.min(61, Math.max(1, istDay(Date.now()) - istDay(START) + 1));
     const left = Math.max(0, istDay(END) - istDay(Date.now()));
     document.getElementById("dayline").textContent = `Day ${day}. Ends Jan 17, 2027.`;
-    renderScore(st); renderGaps(st); renderBoard(st); renderStandup(st);
+    renderScore(st); renderGaps(st); renderBoard(st); renderStandup(st); renderCalendar(st);
     document.getElementById("sync").textContent = (st.error ? "The sheet did not answer, so this is the last good copy. " : "")
       + `Synced from the board ${new Date(st.synced_at * 1000).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" })} IST.`;
     if (st.rules && st.rules.length) document.getElementById("footrules").textContent = st.rules.join(" ") + " This page mirrors the board and follows it within 30 seconds.";

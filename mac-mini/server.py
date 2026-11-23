@@ -6,6 +6,7 @@ public Instagram follower count (cached hourly), serves a single-page portal.
 Access gated by a key: first visit with ?k=<key> sets a cookie.
 """
 import http.server, json, os, re, secrets, subprocess, threading, time, urllib.request
+import datetime
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse, parse_qs
 
@@ -31,7 +32,7 @@ _cache = {"board": None, "board_at": 0, "error": None, "ig": None, "ig_at": 0, "
 
 def fetch_sheet():
     params = {"spreadsheetId": SHEET_ID,
-              "ranges": ["Scoreboard!A1:Z60", "Priorities!A1:Z60", "Standup!A1:Z200", "Pipeline!A1:Z40"],
+              "ranges": ["Scoreboard!A1:Z60", "Priorities!A1:Z60", "Standup!A1:Z200", "Pipeline!A1:Z40", "Commitments!A1:Z400"],
               "valueRenderOption": "FORMATTED_VALUE"}
     for attempt in range(3):  # Google connections on this network reset now and then; retry before giving up
         r = subprocess.run([GWS, "sheets", "spreadsheets", "values", "batchGet", "--params", json.dumps(params)],
@@ -171,6 +172,30 @@ def edit_cell(sheet, row_idx, header):
     return f"{sheet}!{col}{row}"
 
 
+def add_task(due_iso, text, owner):
+    """Append a new deadline as a row in Commitments. due_iso is YYYY-MM-DD; stored as a sheet-native date string."""
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("task text is required")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", due_iso or ""):
+        raise ValueError("bad date")
+    y, m, d = (int(x) for x in due_iso.split("-"))
+    due_label = datetime.date(y, m, d).strftime("%a %b ") + str(d)
+    rows = _cache["board"]["Commitments"] if _cache["board"] else []
+    next_n = max([int(r["#"]) for r in rows if r.get("#", "").isdigit()], default=0) + 1
+    logged = time.strftime("%Y-%m-%d", time.gmtime(time.time() + IST))
+    params = {"spreadsheetId": SHEET_ID, "range": "Commitments!A1", "valueInputOption": "USER_ENTERED",
+              "insertDataOption": "INSERT_ROWS"}
+    row = [str(next_n), (owner or "").strip() or "Unassigned", text, due_label, "", "Not started", "", logged, "Added from the calendar"]
+    r = subprocess.run([GWS, "sheets", "spreadsheets", "values", "append", "--params", json.dumps(params),
+                        "--json", json.dumps({"values": [row]})], capture_output=True, text=True, timeout=30)
+    out = "\n".join(l for l in r.stdout.splitlines() if not l.startswith("Using keyring"))
+    res = json.loads(out)
+    if "error" in res:
+        raise RuntimeError(str(res["error"])[:200])
+    _cache["board_at"] = 0  # force the next read to pick up the new row
+
+
 class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
         pass
@@ -226,6 +251,14 @@ class H(http.server.BaseHTTPRequestHandler):
         a = self.authed(q)
         if not a:
             return self.send(401, json.dumps({"error": "locked"}), "application/json")
+        if u.path == "/api/add-task":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+                add_task(body.get("due"), body.get("text"), body.get("owner"))
+                return self.send(200, json.dumps({"ok": True}), "application/json")
+            except Exception as e:
+                return self.send(400, json.dumps({"error": str(e)[:200]}), "application/json")
         if u.path != "/api/edit":
             return self.send(404, json.dumps({"error": "not found"}), "application/json")
         try:
