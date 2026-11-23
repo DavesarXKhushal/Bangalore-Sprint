@@ -197,6 +197,19 @@ def add_task(due_iso, text, owner):
     _cache["board_at"] = 0  # force the next read to pick up the new row
 
 
+def delete_task(row_idx):
+    """Blank out one Commitments row (calendar right-click delete). Clearing, not shifting rows, keeps every other row's index stable."""
+    row = EDITABLE["Commitments"]["first_row"] + int(row_idx)
+    params = {"spreadsheetId": SHEET_ID, "range": f"Commitments!A{row}:I{row}"}
+    r = subprocess.run([GWS, "sheets", "spreadsheets", "values", "clear", "--params", json.dumps(params)],
+                        capture_output=True, text=True, timeout=30)
+    out = "\n".join(l for l in r.stdout.splitlines() if not l.startswith("Using keyring"))
+    res = json.loads(out)
+    if "error" in res:
+        raise RuntimeError(str(res["error"])[:200])
+    _cache["board_at"] = 0
+
+
 class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, fmt, *a):
         pass
@@ -257,6 +270,14 @@ class H(http.server.BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length) or b"{}")
                 add_task(body.get("due"), body.get("text"), body.get("owner"))
+                return self.send(200, json.dumps({"ok": True}), "application/json")
+            except Exception as e:
+                return self.send(400, json.dumps({"error": str(e)[:200]}), "application/json")
+        if u.path == "/api/delete-task":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length) or b"{}")
+                delete_task(body.get("row"))
                 return self.send(200, json.dumps({"ok": True}), "application/json")
             except Exception as e:
                 return self.send(400, json.dumps({"error": str(e)[:200]}), "application/json")

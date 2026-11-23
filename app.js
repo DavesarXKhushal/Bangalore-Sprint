@@ -310,6 +310,25 @@ async function postMoveTask(row, due) {
     load(true);
   }
 }
+async function postDeleteTask(row) {
+  try {
+    const r = await fetch("/api/delete-task", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ row }) });
+    const d = await r.json();
+    if (!r.ok || d.error) throw new Error(d.error || "delete failed");
+  } catch (err) {
+    toast("Could not delete: " + err.message);
+    load(true);
+  }
+}
+function deleteTask(row) {
+  const coms = last.board.Commitments || [];
+  const idx = coms.findIndex(c => c.row === row);
+  if (idx === -1) return;
+  coms.splice(idx, 1);
+  renderCalendar(last);
+  toast("Deleted.");
+  postDeleteTask(row);
+}
 function openCalAdd(cell) {
   if (cell.querySelector(".cal-form")) { cell.querySelector(".cal-form input").focus(); return; }
   const date = cell.dataset.date;
@@ -333,34 +352,72 @@ function openCalAdd(cell) {
   });
   input.addEventListener("blur", () => setTimeout(() => { if (document.body.contains(form) && document.activeElement !== input) form.remove(); }, 150));
 }
+// Pointer-based drag (not native HTML5 DnD, which trackpads and touch handle inconsistently).
+let dragState = null;
+function positionGhost(x, y) {
+  dragState.ghost.style.left = (x - dragState.offsetX) + "px";
+  dragState.ghost.style.top = (y - dragState.offsetY) + "px";
+}
+function onDragMove(e) {
+  if (!dragState) return;
+  if (Math.abs(e.clientX - dragState.startX) > 3 || Math.abs(e.clientY - dragState.startY) > 3) {
+    dragState.moved = true;
+    dragState.ghost.style.display = "block";
+  }
+  positionGhost(e.clientX, e.clientY);
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const cell = el && el.closest(".cal-cell:not(.empty)");
+  if (dragState.overCell && dragState.overCell !== cell) dragState.overCell.classList.remove("drag-over");
+  if (cell) cell.classList.add("drag-over");
+  dragState.overCell = cell;
+}
+function onDragEnd() {
+  document.removeEventListener("pointermove", onDragMove);
+  if (!dragState) return;
+  const { row, overCell, moved, sourceChip, ghost } = dragState;
+  ghost.remove();
+  sourceChip.classList.remove("dragging");
+  if (overCell) overCell.classList.remove("drag-over");
+  dragState = null;
+  if (!moved || !overCell) return;
+  const key = overCell.dataset.date;
+  const c = (last.board.Commitments || []).find(x => x.row === row);
+  if (!c || !key) return;
+  const [y, m, d] = key.split("-").map(Number);
+  c.Due = dueLabel(y, m - 1, d);
+  renderCalendar(last);
+  postMoveTask(row, c.Due);
+}
+function startDrag(e, chip) {
+  const row = +chip.dataset.row;
+  const rect = chip.getBoundingClientRect();
+  const ghost = chip.cloneNode(true);
+  ghost.className = "cal-ghost";
+  ghost.style.width = rect.width + "px";
+  ghost.style.display = "none";
+  document.body.appendChild(ghost);
+  dragState = { row, ghost, startX: e.clientX, startY: e.clientY, offsetX: e.clientX - rect.left, offsetY: e.clientY - rect.top, overCell: null, moved: false, sourceChip: chip };
+  positionGhost(e.clientX, e.clientY);
+  chip.classList.add("dragging");
+  document.addEventListener("pointermove", onDragMove);
+  document.addEventListener("pointerup", onDragEnd, { once: true });
+}
 function wireCalendar() {
   document.getElementById("cal-prev").onclick = () => navCal(-1);
   document.getElementById("cal-next").onclick = () => navCal(1);
   document.querySelectorAll(".cal-cell:not(.empty)").forEach(cell => {
     cell.addEventListener("click", e => { if (!e.target.closest(".cal-task") && !e.target.closest(".cal-form")) openCalAdd(cell); });
-    cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
-    cell.addEventListener("dragleave", () => cell.classList.remove("drag-over"));
-    cell.addEventListener("drop", e => {
-      e.preventDefault();
-      cell.classList.remove("drag-over");
-      const row = +e.dataTransfer.getData("text/plain");
-      const key = cell.dataset.date;
-      const c = (last.board.Commitments || []).find(x => x.row === row);
-      if (!c || !key) return;
-      const [y, m, d] = key.split("-").map(Number);
-      c.Due = dueLabel(y, m - 1, d);
-      renderCalendar(last);
-      postMoveTask(row, c.Due);
-    });
   });
   document.querySelectorAll(".cal-task").forEach(chip => {
-    chip.addEventListener("dragstart", e => { e.dataTransfer.setData("text/plain", chip.dataset.row); chip.classList.add("dragging"); });
-    chip.addEventListener("dragend", () => chip.classList.remove("dragging"));
+    chip.addEventListener("pointerdown", e => { if (e.button !== 0 && e.pointerType === "mouse") return; e.stopPropagation(); startDrag(e, chip); });
+    chip.addEventListener("contextmenu", e => { e.preventDefault(); deleteTask(+chip.dataset.row); });
+    chip.addEventListener("click", e => e.stopPropagation());
   });
 }
 function renderCalendar(st) {
   if (calMonthIdx == null) calMonthIdx = calDefaultMonth();
-  const coms = (st.board.Commitments || []).map((c, i) => ({ ...c, row: c.row ?? i }));
+  const coms = st.board.Commitments || (st.board.Commitments = []);
+  coms.forEach((c, i) => { if (c.row == null) c.row = i; });  // stamp row onto the real records so drag/delete can find them again
   const byDay = {};
   coms.forEach(c => {
     const t = parseDate(c.Due, false);
@@ -377,7 +434,7 @@ function renderCalendar(st) {
     const tasks = byDay[key] || [];
     const isToday = key === todayKey;
     const inSprint = key >= SPRINT_START_KEY && key <= SPRINT_END_KEY;
-    const chips = tasks.map(c => `<div class="cal-task" draggable="true" data-row="${c.row}" title="Drag to move">${esc(c.Owner || "")}${c.Owner ? ": " : ""}${esc(c.Commitment || "")}</div>`).join("");
+    const chips = tasks.map(c => `<div class="cal-task" data-row="${c.row}" title="Drag to move, right-click to delete">${esc(c.Owner || "")}${c.Owner ? ": " : ""}${esc(c.Commitment || "")}</div>`).join("");
     return `<div class="cal-cell${isToday ? " today" : ""}${inSprint ? "" : " out"}" data-date="${key}">
       <div class="cal-num">${d}</div>
       <div class="cal-tasks">${chips}</div>
