@@ -248,9 +248,13 @@ const STAGE_CLASS = { "Idea": "st-idea", "Script": "st-script", "Build / Shoot":
                        "Finished (banked)": "st-fin", "Posted": "st-posted" };
 
 function renderBoard(st) {
-  const rows = (st.board.Pipeline || []).map((r, i) => ({ ...r, row: i }));
+  // Only show actual work. Empty future slots stay in the sheet, not on the portal.
+  const rows = (st.board.Pipeline || [])
+    .map((r, i) => ({ ...r, row: i }))
+    .filter(r => r["Title / idea"].trim() || r["Notes / blocker"].trim());
   const cols = STAGES.map(stage => {
     const items = rows.filter(r => (r.Stage || "Idea") === stage);
+    if (!items.length) return "";
     const cards = items.map(r => {
       const links = [["Script", r["Script link"]], ["Draft", r["Draft 1"]], ["Edit folder", r["Edit folder"]], ["Post", r["Post link"]]]
         .filter(([, u]) => u).map(([label, u]) => `<a class="lk" href="${esc(u)}" target="_blank" rel="noopener">${label}</a>`).join("");
